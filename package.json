@@ -11,6 +11,10 @@
     "type": "git",
     "url": "https://github.com/ozomer/node-red-node-mongodb2"
   },
+  "author": {
+    "name": "Oren Zomer",
+    "email": "oren.zomer@gmail.com"
+  },
   "license": "Apache-v2.0",
   "keywords": [
     "node-red",
