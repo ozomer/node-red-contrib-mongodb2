@@ -1,6 +1,6 @@
 {
   "name": "node-red-node-mongodb2",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "MongoDB 2 driver node for Node-RED",
   "dependencies": {
     "mongodb": "~2.0.16",
