@@ -1,0 +1,30 @@
+{
+  "name": "node-red-node-mongodb2",
+  "version": "0.0.1",
+  "description": "MongoDB 2 driver node for Node-RED",
+  "dependencies": {
+    "mongodb": "~2.0.16",
+    "cfenv": "~1.0.0",
+    "when": "~3.7.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ozomer/node-red-node-mongodb2"
+  },
+  "license": "Apache-v2.0",
+  "keywords": [
+    "node-red",
+    "bluemix",
+    "mongodb"
+  ],
+  "node-red": {
+    "nodes": {
+      "mongodb2": "mongodb2/mongodb2.js"
+    }
+  },
+  "jshintConfig": {
+    "undef": true,
+    "unused": true,
+    "node": true
+  }
+}

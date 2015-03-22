@@ -1,0 +1,232 @@
+<!--
+  Copyright 2015 Awear Solutions Ltd.
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+
+<script type="text/x-red" data-template-name="mongodb2">
+  <div class="form-row">
+    <label for="node-config-input-hostname"><i class="icon-bookmark"></i> Host</label>
+    <input class="input-append-left" type="text" id="node-config-input-hostname" placeholder="localhost" style="width: 40%;" />
+    <label for="node-config-input-port" style="margin-left: 10px; width: 35px; "> Port</label>
+    <input type="text" id="node-config-input-port" placeholder="27017" style="width:45px" />
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-db"><i class="icon-briefcase"></i> Database</label>
+    <input type="text" id="node-config-input-db" placeholder="test" />
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-name"><i class="icon-tag"></i> Name</label>
+    <input type="text" id="node-config-input-name" placeholder="Name" />
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-username"><i class="icon-user"></i> Username</label>
+    <input type="text" id="node-config-input-username" />
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-password"><i class="icon-lock"></i> Password</label>
+    <input type="password" id="node-config-input-password" />
+  </div>
+</script>
+
+<script type="text/javascript">
+RED.nodes.registerType("mongodb2", {
+  category: "config",
+  color: "#b7a492",
+  defaults: {
+    hostname: {
+      value: "127.0.0.1"
+    },
+    port: {
+      value: 27017
+    },
+    db: {
+      value: ""
+    },
+    name: {
+      value: ""
+    }
+  },
+  label: function() {
+    return this.name || (this.hostname + ":" + this.port + "/" + this.db);
+  },
+  oneditprepare: function() {
+    $.getJSON("mongodb2/" + this.id, function(data) {
+      if (data.user) {
+        $('#node-config-input-username').val(data.user);
+      }
+      if (data.hasPassword) {
+        $('#node-config-input-password').val('__PWRD__');
+      } else {
+        $('#node-config-input-password').val('');
+      }
+    });
+  },
+  oneditsave: function() {
+    var newUser = $('#node-config-input-username').val();
+    var newPass = $('#node-config-input-password').val();
+    var credentials = {};
+    credentials.user = newUser;
+    if (newPass != '__PWRD__') {
+      credentials.password = newPass;
+    }
+    $.ajax({
+      url: "mongodb2/" + this.id,
+      type: 'POST',
+      data: credentials,
+      success: function(result) {}
+    });
+  },
+  ondelete: function() {
+    $.ajax({
+      url: "mongodb2/" + this.id,
+      type: 'DELETE',
+      success: function(result) {}
+    });
+  }
+});
+</script>
+
+<script type="text/x-red" data-template-name="mongodb2 in">
+  <div class="form-row">
+    <label for="node-input-service"><i class="icon-folder-close"></i> Service</label>
+    <select id="node-input-service">
+      <option value="" disabled></option>
+      <option value="_ext_">External service</option>
+    </select>
+  </div>
+  <div class="form-row hide" id="node-input-external-details">
+    <label for="node-input-configNode"><i class="icon-bookmark"></i> Server</label>
+    <input type="text" id="node-input-configNode" />
+  </div>
+  <div class="form-row">
+    <label for="node-input-collection"><i class="icon-briefcase"></i> Collection</label>
+    <input type="text" id="node-input-collection" placeholder="collection" />
+  </div>
+  <div class="form-row">
+    <label for="node-input-operation"><i class="fa fa-wrench"></i> Operation</label>
+    <select type="text" id="node-input-operation" style="display: inline-block; vertical-align: top;">
+      <option value="" id="node-input-dynamic-operation" style="font-style: italic;">Dynamic (msg.operation)</option>
+    </select>
+  </div>
+  <div class="form-row">
+  <label for="node-input-name"><i class="icon-tag"></i> Name</label>
+  <input type="text" id="node-input-name" placeholder="Name" />
+  </div>
+  <div class="form-tips" id="node-warning" style="display: none">
+    <b> Tip:</b> If no collection is set, ensure <b>msg.collection</b> will contain the collection name.
+  </div>
+</script>
+
+<script type="text/x-red" data-help-name="mongodb2 in">
+  <p>Calls a MongoDB collection method based on the selected operator.</p>
+  <p>If <b>msg.payload</b> is an array, each element is passed as an arugment.</p>
+  <p>See the <a href="http://mongodb.github.io/node-mongodb-native/2.0/api/Collection.html" target="_blank"><i>MongoDB collection api-2 docs</i></a> for examples.</p>
+  <p>The result is returned in <b>msg.payload</b>.</p>
+</script>
+
+<script type="text/javascript">
+RED.nodes.registerType("mongodb2 in", {
+  category: "storage-input",
+  color: "#b7a492",
+  defaults: {
+    service: {
+      value: "",
+      required: true
+    },
+    configNode: {
+      type: "mongodb2",
+      validate: function validateServer(v) {
+        return this.service !== "_ext_" || v !== "_ADD_";
+      }
+    },
+    name: {
+      value: ""
+    },
+    collection: {
+      value: ""
+    },
+    operation: {
+      value: ""
+    }
+  },
+  inputs: 1,
+  outputs: 1,
+  icon: "mongodb.png",
+  label: function label() {
+    var mongoConfigNode = RED.nodes.node(this.configNode);
+    if (this.name) {
+      return this.name;
+    }
+    var serviceName = "mongodb2";
+    if (this.service && this.service !== "_ext_") {
+      serviceName = this.service;
+    } else if (mongoConfigNode) {
+      serviceName = mongoConfigNode.label();
+    }
+    return serviceName + " " + this.collection + " " + this.operation;
+  },
+  labelStyle: function() {
+    return this.name ? "node_label_italic" : "";
+  },
+  oneditprepare: function oneditprepare() {
+    var serviceSelect = $('#node-input-service');
+    var node = this;
+    $.getJSON("mongodb2/vcap", function(data) {
+      var last = serviceSelect.children().last();
+      var opts = data.map(function(d) {
+        return $('<option></option>').attr('value', d.name).attr('selected', node.service === d.name).text(d.name).wrap('<p/>').parent().html();
+      });
+      if (opts.length === 0) {
+        node.service = "_ext_";
+        serviceSelect.find("option").filter(function() {
+          return $(this).val() === node.service;
+        }).attr('selected', true);
+      } else {
+        last.before(opts.join(""));
+      }
+      serviceSelect.change();
+    });
+
+    serviceSelect.change(function() {
+      var service = serviceSelect.val();
+      if (service === "_ext_") {
+        $('#node-input-external-details').show();
+      } else {
+        $('#node-input-external-details').hide();
+      }
+    });
+
+    var selectOperation = $('#node-input-operation');
+    console.log('getting operations json');
+    $.getJSON("mongodb2/operations", function(data) {
+      console.log('operations', data);
+      selectOperation.children().last().after(data.map(function(d) {
+        return $('<option></option>').attr('value', d).attr('selected', node.operation === d).text(d).wrap('<p/>').parent().html();
+      }).join(""));
+      if (data.indexOf(node.operation) < 0) {
+        $('#node-input-dynamic-operation').attr('selected', true);
+      }
+      selectOperation.change();
+    });
+
+    $('#node-input-collection').change(function () {
+      if($('#node-input-collection').val()) {
+        $('#node-warning').hide();
+      } else {
+        $('#node-warning').show();
+      }
+    });
+  }
+});
+</script>
