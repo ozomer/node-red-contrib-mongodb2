@@ -58,16 +58,45 @@ module.exports = function(RED) {
       }
     });
   };
-  // override listIndexes with a function that accepts a callback
-  operations.listIndexes = function() {
+
+  // We don't want to pass the aggregate's cursor directly.
+  delete operations.aggregate;
+  operations['aggregate.toArray'] = function() {
     var args = Array.prototype.slice.call(arguments, 0);
-    var callback = args.pop(); // The real callback, if options was not given.
-    try {
-      callback(null, mongodb.Collection.prototype.listIndexes.apply(this, args));
-    } catch(err) {
-      callback(err);
-    }
+    var callback = args.pop();
+    mongodb.Collection.prototype.aggregate.apply(this, args).toArray(callback);
   };
+  operations['aggregate.forEach'] = function() {
+    var args = Array.prototype.slice.call(arguments, 0);
+    var callback = args.pop();
+    mongodb.Collection.prototype.aggregate.apply(this, args).forEach(function(doc) {
+      callback(null, doc);
+    }, function(err) {
+      if (err) {
+        callback(err);
+      }
+    });
+  };
+
+  // We don't want to pass the listIndexes's cursor directly.
+  delete operations.listIndexes;
+  operations['listIndexes.toArray'] = function() {
+    var args = Array.prototype.slice.call(arguments, 0);
+    var callback = args.pop();
+    mongodb.Collection.prototype.listIndexes.apply(this, args).toArray(callback);
+  };
+  operations['listIndexes.forEach'] = function() {
+    var args = Array.prototype.slice.call(arguments, 0);
+    var callback = args.pop();
+    mongodb.Collection.prototype.listIndexes.apply(this, args).forEach(function(doc) {
+      callback(null, doc);
+    }, function(err) {
+      if (err) {
+        callback(err);
+      }
+    });
+  };
+
   RED.nodes.registerType("mongodb2", function Mongo2ConfigNode(n) {
     RED.nodes.createNode(this, n);
     this.hostname = n.hostname;
@@ -236,16 +265,32 @@ module.exports = function(RED) {
           // We must not pass too many arguments to the operation.
           args = args.slice(0, operation.length - 1);
         }
+        node.status({
+          "fill": "blue",
+          "shape": "dot",
+          "text": "requesting"
+        });
         try {
           operation.apply(collection, args.concat(function(err, result) {
             if (err) {
+              node.status({
+                "fill": "red",
+                "shape": "ring",
+                "text": "error"
+              });
               node.error(err);
               return;
             }
+            node.status({});
             msg.payload = result;
             node.send(msg);
           }));
         } catch(err) {
+          node.status({
+            "fill": "red",
+            "shape": "ring",
+            "text": "error"
+          });
           node.error(err);
         }
       });
