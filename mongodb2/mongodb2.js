@@ -234,7 +234,7 @@ module.exports = function(RED) {
           collection = db.collection(msg.collection);
         }
         if (!collection) {
-          node.error("No collection defined");
+          node.error("No collection defined", msg);
           return;
         }
         var operation = nodeOperation;
@@ -242,7 +242,7 @@ module.exports = function(RED) {
           operation = operations[msg.operation];
         }
         if (!operation) {
-          node.error("No operation defined");
+          node.error("No operation defined", msg);
           return;
         }
 
@@ -278,7 +278,7 @@ module.exports = function(RED) {
                 "shape": "ring",
                 "text": "error"
               });
-              node.error(err);
+              node.error(err, msg);
               return;
             }
             node.status({});
@@ -291,7 +291,7 @@ module.exports = function(RED) {
             "shape": "ring",
             "text": "error"
           });
-          node.error(err);
+          node.error(err, msg);
         }
       });
     }, function(err) {
