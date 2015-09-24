@@ -20,7 +20,8 @@ module.exports = function(RED) {
   var when = require("when");
   var appEnv = require("cfenv").getAppEnv();
   var mongodb = require("mongodb");
-  var operationNotFinished = {};
+  var forEachIteration = new Error("node-red-contrib-mongodb2 forEach iteration");
+  var forEachEnd = new Error("node-red-contrib-mongodb2 forEach end");
 
   var services = [];
   Object.keys(appEnv.services).forEach(function(label) {
@@ -52,8 +53,10 @@ module.exports = function(RED) {
     var args = Array.prototype.slice.call(arguments, 0);
     var callback = args.pop();
     mongodb.Collection.prototype.find.apply(this, args).forEach(function(doc) {
-      return callback(operationNotFinished, doc);
-    }, callback);
+      return callback(forEachIteration, doc);
+    }, function(err) {
+      return callback(err || forEachEnd);
+    });
   };
 
   // We don't want to pass the aggregate's cursor directly.
@@ -67,8 +70,10 @@ module.exports = function(RED) {
     var args = Array.prototype.slice.call(arguments, 0);
     var callback = args.pop();
     mongodb.Collection.prototype.aggregate.apply(this, args).forEach(function(doc) {
-      return callback(operationNotFinished, doc);
-    }, callback);
+      return callback(forEachIteration, doc);
+    }, function(err) {
+      return callback(err || forEachEnd);
+    });
   };
 
   // We don't want to pass the listIndexes's cursor directly.
@@ -82,8 +87,10 @@ module.exports = function(RED) {
     var args = Array.prototype.slice.call(arguments, 0);
     var callback = args.pop();
     mongodb.Collection.prototype.listIndexes.apply(this, args).forEach(function(doc) {
-      return callback(operationNotFinished, doc);
-    }, callback);
+      return callback(forEachIteration, doc);
+    }, function(err) {
+      return callback(err || forEachEnd);
+    });
   };
 
   RED.nodes.registerType("mongodb2", function Mongo2ConfigNode(n) {
@@ -261,23 +268,24 @@ module.exports = function(RED) {
         });
         try {
           operation.apply(collection, args.concat(function(err, result) {
-            if (err) {
-              if (err != operationNotFinished) {
-                node.status({
-                  "fill": "red",
-                  "shape": "ring",
-                  "text": "error"
-                });
-                node.error(err, msg);
-                return;
-              }
+            if (err && (forEachIteration != err) && (forEachEnd != err)) {
+              node.status({
+                "fill": "red",
+                "shape": "ring",
+                "text": "error"
+              });
+              node.error(err, msg);
+              return;
             }
-            else {
-              // Operation finished successfully.
+            if (forEachIteration != err) {
+              // clear status
               node.status({});
             }
-            msg.payload = result;
-            node.send(msg);
+            if (forEachEnd != err) {
+              // send msg (when err == forEachEnd, this is just a forEach completion).
+              msg.payload = result;
+              node.send(msg);
+            }
           }));
         } catch(err) {
           node.status({
