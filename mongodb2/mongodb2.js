@@ -223,7 +223,7 @@ module.exports = function(RED) {
       return;
     }
     var node = this;
-    getClient(this.url).then(function(client) {
+    getClient(node.config).then(function(client) {
       var nodeCollection;
       if (node.collection) {
         nodeCollection = client.db.collection(node.collection);
@@ -330,9 +330,9 @@ module.exports = function(RED) {
       // Failed to create db client
       node.error(err);
     });
-    this.on("close", function() {
-      if (this.config) {
-        closeClient(this.config);
+    node.on("close", function() {
+      if (node.config) {
+        closeClient(node.config);
       }
     });
   });
