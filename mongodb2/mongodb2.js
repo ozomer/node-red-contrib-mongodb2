@@ -92,6 +92,14 @@ module.exports = function(RED) {
     });
   };
 
+  operations.db = function(callback) {
+    return callback(null, this);
+  };
+
+  operations.collection = function(callback) {
+    return callback(null, this);
+  };
+
   RED.nodes.registerType("mongodb2", function Mongo2ConfigNode(n) {
     RED.nodes.createNode(this, n);
     this.hostname = n.hostname;
@@ -242,14 +250,6 @@ module.exports = function(RED) {
       });
       function handleMessage(msg) {
         client.parallelOps += 1;
-        var collection = nodeCollection;
-        if (!collection && msg.collection) {
-          collection = client.db.collection(msg.collection);
-        }
-        if (!collection) {
-          node.error("No collection defined", msg);
-          return messageHandlingCompleted();
-        }
         var operation = nodeOperation;
         if (!operation && msg.operation) {
           operation = operations[msg.operation];
@@ -257,6 +257,17 @@ module.exports = function(RED) {
         if (!operation) {
           node.error("No operation defined", msg);
           return messageHandlingCompleted();
+        }
+        var collection; // stays undefined in the case of "db" operation.
+        if (operation != operations.db) {
+          collection = nodeCollection;
+          if (!collection && msg.collection) {
+            collection = client.db.collection(msg.collection);
+          }
+          if (!collection) {
+            node.error("No collection defined", msg);
+            return messageHandlingCompleted();
+          }
         }
 
         delete msg.collection;
@@ -283,7 +294,7 @@ module.exports = function(RED) {
           "text": "requesting"
         });
         try {
-          operation.apply(collection, args.concat(function(err, result) {
+          operation.apply(collection || client.db, args.concat(function(err, result) {
             if (err && (forEachIteration != err) && (forEachEnd != err)) {
               node.status({
                 "fill": "red",
