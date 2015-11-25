@@ -17,7 +17,6 @@
 module.exports = function(RED) {
   "use strict";
   var url = require("url");
-  var when = require("when");
   var appEnv = require("cfenv").getAppEnv();
   var mongodb = require("mongodb");
   var forEachIteration = new Error("node-red-contrib-mongodb2 forEach iteration");
@@ -99,6 +98,7 @@ module.exports = function(RED) {
     this.port = n.port;
     this.db = n.db;
     this.name = n.name;
+    this.parallelism = n.parallelism * 1;
     var credentials = RED.nodes.getCredentials(n.id);
     if (credentials) {
       this.username = credentials.user;
@@ -107,11 +107,18 @@ module.exports = function(RED) {
     this.url = url.format({
       "protocol": "mongodb",
       "slashes": true,
-      "auth": (this.username?(this.username + ':' + this.password):""),
+      "auth": (this.username?(encodeURIComponent(this.username) + ':' + encodeURIComponent(this.password)):""),
       "hostname": this.hostname,
       "port": this.port,
       "pathname": this.db
     });
+    if (!!n.options) {
+      try {
+        this.options = JSON.parse(n.options);
+      } catch (err) {
+        this.error("Failed to parse options: " + err);
+      }
+    }
   });
 
   RED.httpAdmin.get('/mongodb2/vcap', function(req, res) {
@@ -158,19 +165,18 @@ module.exports = function(RED) {
 
   var mongoPool = {};
 
-  function getDb(mongoUrl) {
-    var poolCell = mongoPool[mongoUrl];
+  function getClient(config) {
+    var poolCell = mongoPool['#' + config.id];
     if (!poolCell) {
-      mongoPool[mongoUrl] = poolCell = {
-        instances: 0,
-        promise: when.promise(function(resolve, reject) {
-          mongodb.MongoClient.connect(mongoUrl, function(err, db) {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(db);
-            }
-          });
+      mongoPool['#' + config.id] = poolCell = {
+        "instances": 0,
+        // es6-promise. A client will be called only once.
+        "promise": mongodb.MongoClient.connect(config.url, config.options || {}).then(function(db) {
+          return {
+            "db": db,
+            "queue": [],
+            "parallelOps": 0 // current number of operations
+          };
         })
       };
     }
@@ -178,16 +184,16 @@ module.exports = function(RED) {
     return poolCell.promise;
   }
 
-  function closeDb(mongoUrl) {
-    var poolCell = mongoPool[mongoUrl];
+  function closeClient(config) {
+    var poolCell = mongoPool['#' + config.id];
     if (!poolCell) {
       return;
     }
     poolCell.instances--;
     if (poolCell.instances === 0) {
-      delete mongoPool[mongoUrl];
-      poolCell.promise.done(function(db) {
-        db.close();
+      delete mongoPool['#' + config.id];
+      poolCell.promise.then(function(client) {
+        client.db.close();
       }, function() { // ignore error
         // db-client was not created in the first place.
       });
@@ -200,38 +206,49 @@ module.exports = function(RED) {
     this.collection = n.collection;
     this.operation = n.operation;
     if (n.service == "_ext_") {
-      var mongoConfigNode = RED.nodes.getNode(this.configNode);
-      if (mongoConfigNode) {
-        this.url = mongoConfigNode.url;
-      }
+      // Refer to the config node's id, url, options, parallelism.
+      this.config = RED.nodes.getNode(this.configNode);
     } else if (n.service) {
       var configService = appEnv.getService(n.service);
       if (configService) {
-        this.url = configService.credentials.url || configService.credentials.uri;
+        // Only a url is defined.
+        this.config = {
+          "id": 'service:' + n.service, // different from node-red node ids.
+          "url": configService.credentials.url || configService.credentials.uri
+        };
       }
     }
-    if (!this.url) {
+    if (!this.config || !this.config.url) {
       this.error("missing mongodb2 configuration");
       return;
     }
     var node = this;
-    getDb(this.url).done(function(db) {
+    getClient(this.url).then(function(client) {
       var nodeCollection;
       if (node.collection) {
-        nodeCollection = db.collection(node.collection);
+        nodeCollection = client.db.collection(node.collection);
       }
       var nodeOperation;
       if (node.operation) {
         nodeOperation = operations[node.operation];
       }
       node.on("input", function(msg) {
+        if (node.config.parallelism && (node.config.parallelism > 0) && (client.parallelOps >= node.config.parallelism)) {
+          // msg cannot be handled right now - push to queue.
+          client.queue.push(msg);
+          return;
+        }
+        handleMessage(msg);
+      });
+      function handleMessage(msg) {
+        client.parallelOps += 1;
         var collection = nodeCollection;
         if (!collection && msg.collection) {
-          collection = db.collection(msg.collection);
+          collection = client.db.collection(msg.collection);
         }
         if (!collection) {
           node.error("No collection defined", msg);
-          return;
+          return messageHandlingCompleted();
         }
         var operation = nodeOperation;
         if (!operation && msg.operation) {
@@ -239,10 +256,9 @@ module.exports = function(RED) {
         }
         if (!operation) {
           node.error("No operation defined", msg);
-          return;
+          return messageHandlingCompleted();
         }
 
-        delete msg._topic;
         delete msg.collection;
         delete msg.operation;
 
@@ -275,16 +291,17 @@ module.exports = function(RED) {
                 "text": "error"
               });
               node.error(err, msg);
-              return;
-            }
-            if (forEachIteration != err) {
-              // clear status
-              node.status({});
+              return messageHandlingCompleted();
             }
             if (forEachEnd != err) {
               // send msg (when err == forEachEnd, this is just a forEach completion).
               msg.payload = result;
               node.send(msg);
+            }
+            if (forEachIteration != err) {
+              // clear status
+              node.status({});
+              messageHandlingCompleted();
             }
           }));
         } catch(err) {
@@ -294,15 +311,28 @@ module.exports = function(RED) {
             "text": "error"
           });
           node.error(err, msg);
+          return messageHandlingCompleted();
         }
-      });
+      }
+      function messageHandlingCompleted() {
+        // Asynchronous - prevent recursion overflow.
+        setImmediate(function() {
+          if (client.queue.length > 0) {
+            return handleMessage(client.queue.shift());
+          }
+          if (client.parallelOps <= 0) {
+            return node.error("Something went wrong with node-red-contrib-mongodb2 parallel-ops count");
+          }
+          client.parallelOps -= 1;
+        });
+      }
     }, function(err) {
       // Failed to create db client
       node.error(err);
     });
     this.on("close", function() {
-      if (this.url) {
-        closeDb(this.url);
+      if (this.config) {
+        closeClient(this.config);
       }
     });
   });
