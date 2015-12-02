@@ -214,7 +214,7 @@ module.exports = function(RED) {
     this.collection = n.collection;
     this.operation = n.operation;
     if (n.service == "_ext_") {
-      // Refer to the config node's id, url, options, parallelism.
+      // Refer to the config node's id, url, options, parallelism and warn function.
       this.config = RED.nodes.getNode(this.configNode);
     } else if (n.service) {
       var configService = appEnv.getService(n.service);
@@ -243,11 +243,15 @@ module.exports = function(RED) {
       node.on("input", function(msg) {
         if (node.config.parallelism && (node.config.parallelism > 0) && (client.parallelOps >= node.config.parallelism)) {
           // msg cannot be handled right now - push to queue.
-          client.queue.push(msg);
+          client.queue.push({
+            "node_id": node.id,
+            "msg": msg
+          });
           return;
         }
         handleMessage(msg);
       });
+      node.on('node-red-contrib-mongodb2 handleMessage', handleMessage); // see: messageHandlingCompleted
       function handleMessage(msg) {
         client.parallelOps += 1;
         var operation = nodeOperation;
@@ -326,16 +330,37 @@ module.exports = function(RED) {
         }
       }
       function messageHandlingCompleted() {
-        // Asynchronous - prevent recursion overflow.
-        setImmediate(function() {
-          if (client.queue.length > 0) {
-            return handleMessage(client.queue.shift());
+        while (client.queue.length > 0) {
+          var pendingMessage = client.queue.shift();
+          var targetNode = RED.nodes.getNode(pendingMessage.node_id);
+          if (!targetNode) {
+            // The node was removed before handling the pending message.
+            // This is just a warning because a similar scenario can happen if
+            // a node was removed just before handling a message that was sent
+            // to it.
+            var warning = "Node " + pendingMessage.node_id + " was removed while having a pending message";
+            if (node.config.warn) {
+              // The warning will appear from the config node, because the target
+              // node cannot be found.
+              node.config.warn(warning, pendingMessage.msg)
+            } else {
+              // If the node was configured with a service instead of a config node,
+              // the warning will appear from the current node.
+              // This shouldn't happen in real life because in such scenario
+              // the parallelism limit is not configured.
+              node.warn(warning, pendingMessage.msg);
+            }
+            continue;
           }
-          if (client.parallelOps <= 0) {
-            return node.error("Something went wrong with node-red-contrib-mongodb2 parallel-ops count");
-          }
-          client.parallelOps -= 1;
-        });
+          // Handle the pending message. The number of parallel ops has not changed.
+          return targetNode.emit('node-red-contrib-mongodb2 handleMessage', pendingMessage.msg);
+
+        }
+        // The queue is empty.
+        if (client.parallelOps <= 0) {
+          return node.error("Something went wrong with node-red-contrib-mongodb2 parallel-ops count");
+        }
+        client.parallelOps -= 1;
       }
     }, function(err) {
       // Failed to create db client
@@ -345,6 +370,7 @@ module.exports = function(RED) {
       if (node.config) {
         closeClient(node.config);
       }
+      node.removeAllListeners('node-red-contrib-mongodb2 handleMessage');
     });
   });
 };
