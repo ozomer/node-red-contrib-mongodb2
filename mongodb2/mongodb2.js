@@ -151,7 +151,7 @@ module.exports = function(RED) {
 
   RED.httpAdmin.delete('/mongodb2/:id', function(req, res) {
     RED.nodes.deleteCredentials(req.params.id);
-    res.send(200);
+    res.sendStatus(200);
   });
 
   RED.httpAdmin.post('/mongodb2/:id', function(req, res) {
@@ -168,7 +168,7 @@ module.exports = function(RED) {
       credentials.password = newCreds.password || credentials.password;
     }
     RED.nodes.addCredentials(req.params.id, credentials);
-    res.send(200);
+    res.sendStatus(200);
   });
 
   var mongoPool = {};
@@ -342,7 +342,7 @@ module.exports = function(RED) {
             if (node.config.warn) {
               // The warning will appear from the config node, because the target
               // node cannot be found.
-              node.config.warn(warningMessage, pendingMessage.msg)
+              node.config.warn(warningMessage, pendingMessage.msg);
             } else {
               // If the node was configured with a service instead of a config node,
               // the warning will appear from the current node.
