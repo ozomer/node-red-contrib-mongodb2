@@ -249,11 +249,11 @@ module.exports = function(RED) {
           });
           return;
         }
+        client.parallelOps += 1;
         handleMessage(msg);
       });
       node.on('node-red-contrib-mongodb2 handleMessage', handleMessage); // see: messageHandlingCompleted
       function handleMessage(msg) {
-        client.parallelOps += 1;
         var operation = nodeOperation;
         if (!operation && msg.operation) {
           operation = operations[msg.operation];
@@ -338,23 +338,32 @@ module.exports = function(RED) {
             // This is just a warning because a similar scenario can happen if
             // a node was removed just before handling a message that was sent
             // to it.
-            var warning = "Node " + pendingMessage.node_id + " was removed while having a pending message";
+            var warningMessage = "Node " + pendingMessage.node_id + " was removed while having a pending message";
             if (node.config.warn) {
               // The warning will appear from the config node, because the target
               // node cannot be found.
-              node.config.warn(warning, pendingMessage.msg)
+              node.config.warn(warningMessage, pendingMessage.msg)
             } else {
               // If the node was configured with a service instead of a config node,
               // the warning will appear from the current node.
               // This shouldn't happen in real life because in such scenario
               // the parallelism limit is not configured.
-              node.warn(warning, pendingMessage.msg);
+              node.warn(warningMessage, pendingMessage.msg);
             }
             continue;
           }
-          // Handle the pending message. The number of parallel ops has not changed.
-          return targetNode.emit('node-red-contrib-mongodb2 handleMessage', pendingMessage.msg);
-
+          // Handle the pending message. The number of parallel ops does not change.
+          if (!targetNode.emit('node-red-contrib-mongodb2 handleMessage', pendingMessage.msg)) {
+            // Safety check - if emit() returned false it means there are no listeners to the event.
+            // This shouldn't happen, but if it does, we must try to handle the next message in the queue.
+            var errorMessage = "Node " + pendingMessage.node_id + " could not handle the pending message";
+            if (node.config.error) {
+              node.config.error(errorMessage, pendingMessage.msg);
+            } else {
+              node.error(errorMessage, pendingMessage.msg);
+            }
+          }
+          return;
         }
         // The queue is empty.
         if (client.parallelOps <= 0) {
