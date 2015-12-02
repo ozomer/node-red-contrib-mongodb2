@@ -107,15 +107,10 @@ module.exports = function(RED) {
     this.db = n.db;
     this.name = n.name;
     this.parallelism = n.parallelism * 1;
-    var credentials = RED.nodes.getCredentials(n.id);
-    if (credentials) {
-      this.username = credentials.user;
-      this.password = credentials.password;
-    }
     this.url = url.format({
       "protocol": "mongodb",
       "slashes": true,
-      "auth": (this.username?(encodeURIComponent(this.username) + ':' + encodeURIComponent(this.password)):""),
+      "auth": (this.credentials.user?(encodeURIComponent(this.credentials.user) + ':' + encodeURIComponent(this.credentials.password)):""),
       "hostname": this.hostname,
       "port": this.port,
       "pathname": this.db
@@ -127,6 +122,15 @@ module.exports = function(RED) {
         this.error("Failed to parse options: " + err);
       }
     }
+  }, {
+    "credentials": {
+      "user": {
+        "type": "text"
+      },
+      "password": {
+        "type": "password"
+      }
+    }
   });
 
   RED.httpAdmin.get('/mongodb2/vcap', function(req, res) {
@@ -135,40 +139,6 @@ module.exports = function(RED) {
 
   RED.httpAdmin.get('/mongodb2/operations', function(req, res) {
     res.json(Object.keys(operations).sort());
-  });
-
-  RED.httpAdmin.get('/mongodb2/:id',function(req, res) {
-    var credentials = RED.nodes.getCredentials(req.params.id);
-    if (credentials) {
-      res.json({
-        user: credentials.user,
-        hasPassword: !!credentials.password
-      });
-    } else {
-      res.json({});
-    }
-  });
-
-  RED.httpAdmin.delete('/mongodb2/:id', function(req, res) {
-    RED.nodes.deleteCredentials(req.params.id);
-    res.sendStatus(200);
-  });
-
-  RED.httpAdmin.post('/mongodb2/:id', function(req, res) {
-    var newCreds = req.body;
-    var credentials = RED.nodes.getCredentials(req.params.id) || {};
-    if (!newCreds.user) {
-      delete credentials.user;
-    } else {
-      credentials.user = newCreds.user;
-    }
-    if (newCreds.password === "") {
-      delete credentials.password;
-    } else {
-      credentials.password = newCreds.password || credentials.password;
-    }
-    RED.nodes.addCredentials(req.params.id, credentials);
-    res.sendStatus(200);
   });
 
   var mongoPool = {};
