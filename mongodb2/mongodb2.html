@@ -49,23 +49,31 @@
 
 <script type="text/javascript">
 RED.nodes.registerType("mongodb2", {
-  category: "config",
-  color: "#b7a492",
-  defaults: {
-    hostname: {
-      value: "127.0.0.1"
+  "category": "config",
+  "color": "#b7a492",
+  "defaults": {
+    "hostname": {
+      "value": "127.0.0.1"
     },
-    port: {
-      value: 27017
+    "port": {
+      "value": 27017
     },
-    db: {
-      value: ""
+    "db": {
+      "value": ""
     },
-    name: {
-      value: ""
+    "name": {
+      "value": ""
     }
   },
-  label: function() {
+  "credentials": {
+    "user": {
+      "type": "text"
+    },
+    "password": {
+      "type": "password"
+    }
+  },
+  "label": function() {
     return this.name || (this.hostname + ":" + this.port + "/" + this.db);
   }
 });
