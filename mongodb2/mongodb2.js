@@ -122,6 +122,7 @@ module.exports = function(RED) {
         this.error("Failed to parse options: " + err);
       }
     }
+    this.deploymentId = (1 + Math.random() * 0xffffffff).toString(16).replace('.', '');
   }, {
     "credentials": {
       "user": {
@@ -144,9 +145,9 @@ module.exports = function(RED) {
   var mongoPool = {};
 
   function getClient(config) {
-    var poolCell = mongoPool['#' + config.id];
+    var poolCell = mongoPool['#' + config.deploymentId];
     if (!poolCell) {
-      mongoPool['#' + config.id] = poolCell = {
+      mongoPool['#' + config.deploymentId] = poolCell = {
         "instances": 0,
         // es6-promise. A client will be called only once.
         "promise": mongodb.MongoClient.connect(config.url, config.options || {}).then(function(db) {
@@ -163,13 +164,13 @@ module.exports = function(RED) {
   }
 
   function closeClient(config) {
-    var poolCell = mongoPool['#' + config.id];
+    var poolCell = mongoPool['#' + config.deploymentId];
     if (!poolCell) {
       return;
     }
     poolCell.instances--;
     if (poolCell.instances === 0) {
-      delete mongoPool['#' + config.id];
+      delete mongoPool['#' + config.deploymentId];
       poolCell.promise.then(function(client) {
         client.db.close();
       }, function() { // ignore error
@@ -191,7 +192,7 @@ module.exports = function(RED) {
       if (configService) {
         // Only a url is defined.
         this.config = {
-          "id": 'service:' + n.service, // different from node-red node ids.
+          "deploymentId": 'service:' + n.service, // different from node-red deployment ids.
           "url": configService.credentials.url || configService.credentials.uri
         };
       }
@@ -210,7 +211,7 @@ module.exports = function(RED) {
       if (node.operation) {
         nodeOperation = operations[node.operation];
       }
-      node.on("input", function(msg) {
+      node.on('input', function(msg) {
         if (node.config.parallelism && (node.config.parallelism > 0) && (client.parallelOps >= node.config.parallelism)) {
           // msg cannot be handled right now - push to queue.
           client.queue.push({
@@ -345,7 +346,7 @@ module.exports = function(RED) {
       // Failed to create db client
       node.error(err);
     });
-    node.on("close", function() {
+    node.on('close', function() {
       if (node.config) {
         closeClient(node.config);
       }
