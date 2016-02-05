@@ -16,10 +16,8 @@
 
 <script type="text/x-red" data-template-name="mongodb2">
   <div class="form-row">
-    <label for="node-config-input-hostname"><i class="icon-bookmark"></i> Host</label>
-    <input class="input-append-left" type="text" id="node-config-input-hostname" placeholder="localhost" style="width: 40%;" />
-    <label for="node-config-input-port" style="margin-left: 10px; width: 35px; "> Port</label>
-    <input type="text" id="node-config-input-port" placeholder="27017" style="width:45px" />
+    <label for="node-config-input-uri"><i class="icon-globe"></i> URI</label>
+    <input type="text" id="node-config-input-uri" placeholder="mongodb://host1.yourprovider.com:27017,host2.yourprovider.com:27017/yourdb?replicaSet=foo" />
   </div>
   <div class="form-row">
     <label for="node-config-input-db"><i class="icon-briefcase"></i> Database</label>

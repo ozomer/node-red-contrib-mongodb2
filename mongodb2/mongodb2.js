@@ -16,7 +16,6 @@
 
 module.exports = function(RED) {
   "use strict";
-  var url = require("url");
   var appEnv = require("cfenv").getAppEnv();
   var mongodb = require("mongodb");
   var forEachIteration = new Error("node-red-contrib-mongodb2 forEach iteration");
@@ -102,19 +101,12 @@ module.exports = function(RED) {
 
   RED.nodes.registerType("mongodb2", function Mongo2ConfigNode(n) {
     RED.nodes.createNode(this, n);
-    this.hostname = n.hostname;
-    this.port = n.port;
-    this.db = n.db;
+    this.uri = '' + n.uri;
+    if (this.credentials.user || this.credentials.password) {
+      this.uri = this.uri.replace('://', '://' + encodeURIComponent(this.credentials.user) + ':' + encodeURIComponent(this.credentials.password) + '@');
+    }
     this.name = n.name;
     this.parallelism = n.parallelism * 1;
-    this.url = url.format({
-      "protocol": "mongodb",
-      "slashes": true,
-      "auth": (this.credentials.user?(encodeURIComponent(this.credentials.user) + ':' + encodeURIComponent(this.credentials.password)):""),
-      "hostname": this.hostname,
-      "port": this.port,
-      "pathname": this.db
-    });
     if (!!n.options) {
       try {
         this.options = JSON.parse(n.options);
@@ -150,7 +142,7 @@ module.exports = function(RED) {
       mongoPool['#' + config.deploymentId] = poolCell = {
         "instances": 0,
         // es6-promise. A client will be called only once.
-        "promise": mongodb.MongoClient.connect(config.url, config.options || {}).then(function(db) {
+        "promise": mongodb.MongoClient.connect(config.uri, config.options || {}).then(function(db) {
           return {
             "db": db,
             "queue": [],
@@ -185,19 +177,19 @@ module.exports = function(RED) {
     this.collection = n.collection;
     this.operation = n.operation;
     if (n.service == "_ext_") {
-      // Refer to the config node's id, url, options, parallelism and warn function.
+      // Refer to the config node's id, uri, options, parallelism and warn function.
       this.config = RED.nodes.getNode(this.configNode);
     } else if (n.service) {
       var configService = appEnv.getService(n.service);
       if (configService) {
-        // Only a url is defined.
+        // Only a uri is defined.
         this.config = {
           "deploymentId": 'service:' + n.service, // different from node-red deployment ids.
-          "url": configService.credentials.url || configService.credentials.uri
+          "uri": configService.credentials.uri || configService.credentials.url
         };
       }
     }
-    if (!this.config || !this.config.url) {
+    if (!this.config || !this.config.uri) {
       this.error("missing mongodb2 configuration");
       return;
     }
