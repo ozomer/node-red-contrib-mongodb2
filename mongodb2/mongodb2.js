@@ -293,6 +293,9 @@ module.exports = function(RED) {
         }
       }
       function messageHandlingCompleted() {
+        setImmediate(handlePendingMessageOnDemand);
+      }
+      function handlePendingMessageOnDemand() {
         while (client.queue.length > 0) {
           var pendingMessage = client.queue.shift();
           var targetNode = RED.nodes.getNode(pendingMessage.node_id);
@@ -315,20 +318,23 @@ module.exports = function(RED) {
             }
             continue;
           }
-          // Handle the pending message. The number of parallel ops does not change.
+          // Handle the pending message.
           if (!targetNode.emit('node-red-contrib-mongodb2 handleMessage', pendingMessage.msg)) {
             // Safety check - if emit() returned false it means there are no listeners to the event.
-            // This shouldn't happen, but if it does, we must try to handle the next message in the queue.
+            // Was the target node closed?
+            // This shouldn't happen normally, but if it does, we must try to handle the next message in the queue.
             var errorMessage = "Node " + pendingMessage.node_id + " could not handle the pending message";
             if (node.config.error) {
               node.config.error(errorMessage, pendingMessage.msg);
             } else {
               node.error(errorMessage, pendingMessage.msg);
             }
+            continue;
           }
+          // Another message is being handled. The number of parallel ops does not change.
           return;
         }
-        // The queue is empty.
+        // The queue is empty. The number of parallel ops has reduced.
         if (client.parallelOps <= 0) {
           return node.error("Something went wrong with node-red-contrib-mongodb2 parallel-ops count");
         }
