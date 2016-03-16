@@ -215,7 +215,12 @@ module.exports = function(RED) {
         client.parallelOps += 1;
         handleMessage(msg);
       });
-      node.on('node-red-contrib-mongodb2 handleMessage', handleMessage); // see: messageHandlingCompleted
+      node.on('node-red-contrib-mongodb2 handleMessage', function(msg) {
+        // see: messageHandlingCompleted
+        setImmediate(function(){
+          handleMessage(msg);
+        });
+      });
 
       function handleMessage(msg) {
         var operation = nodeOperation;
