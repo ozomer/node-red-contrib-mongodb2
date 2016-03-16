@@ -8,6 +8,12 @@ To pass multiple parameters to an operation fill `msg.payload` with an array (do
 
 # Change Log
 
+## Changes From 0.3
+**Profiling Status** - Showing the number of requests, the number of successful responses and the number of errors.
+Using a 1-second debounce to avoid changing the status too often.
+
+**Async Handling** - Handle pending messages asynchronously.
+
 ## Changes From 0.2
 **MongoDB 2.1 Driver** - Replacing the mongodb 2.0 driver.
 

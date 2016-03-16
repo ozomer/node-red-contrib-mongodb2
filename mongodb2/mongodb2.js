@@ -216,6 +216,7 @@ module.exports = function(RED) {
         handleMessage(msg);
       });
       node.on('node-red-contrib-mongodb2 handleMessage', handleMessage); // see: messageHandlingCompleted
+
       function handleMessage(msg) {
         var operation = nodeOperation;
         if (!operation && msg.operation) {
@@ -255,19 +256,13 @@ module.exports = function(RED) {
           // We must not pass too many arguments to the operation.
           args = args.slice(0, operation.length - 1);
         }
-        node.status({
-          "fill": "blue",
-          "shape": "dot",
-          "text": "requesting"
-        });
+        profiling.requests += 1;
+        debounceProfilingStatus();
         try {
           operation.apply(collection || client.db, args.concat(function(err, result) {
             if (err && (forEachIteration != err) && (forEachEnd != err)) {
-              node.status({
-                "fill": "red",
-                "shape": "ring",
-                "text": "error"
-              });
+              profiling.error += 1;
+              debounceProfilingStatus();
               node.error(err, msg);
               return messageHandlingCompleted();
             }
@@ -278,16 +273,14 @@ module.exports = function(RED) {
             }
             if (forEachIteration != err) {
               // clear status
-              node.status({});
+              profiling.success += 1;
+              debounceProfilingStatus();
               messageHandlingCompleted();
             }
           }));
         } catch(err) {
-          node.status({
-            "fill": "red",
-            "shape": "ring",
-            "text": "error"
-          });
+          profiling.error += 1;
+          debounceProfilingStatus();
           node.error(err, msg);
           return messageHandlingCompleted();
         }
@@ -344,11 +337,41 @@ module.exports = function(RED) {
       // Failed to create db client
       node.error(err);
     });
+
+    var profiling = {
+      "requests": 0,
+      "success": 0,
+      "error": 0
+    };
+    function profilingStatus() {
+      node.status({
+        "fill": "yellow",
+        "shape": "dot",
+        "text": "" + profiling.requests + ", success: " + profiling.success + ", error: " + profiling.error
+      });
+    }
+
+    var debouncer = null;
+    function debounceProfilingStatus() {
+      if (debouncer) {
+        return;
+      }
+      // show curent status, create debouncer.
+      profilingStatus();
+      debouncer = setTimeout(function() {
+        profilingStatus(); // should we call only if there was a change?
+        debouncer = null;
+      }, 1000);
+    }
+
     node.on('close', function() {
       if (node.config) {
         closeClient(node.config);
       }
       node.removeAllListeners('node-red-contrib-mongodb2 handleMessage');
+      if (debouncer) {
+        clearTimeout(debouncer);
+      }
     });
   });
 };
