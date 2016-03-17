@@ -16,6 +16,7 @@
 
 module.exports = function(RED) {
   "use strict";
+  var EventEmitter = require("events").EventEmitter;
   var appEnv = require("cfenv").getAppEnv();
   var mongodb = require("mongodb");
   var forEachIteration = new Error("node-red-contrib-mongodb2 forEach iteration");
@@ -276,6 +277,20 @@ module.exports = function(RED) {
             if (forEachEnd != err) {
               // send msg (when err == forEachEnd, this is just a forEach completion).
               msg.payload = result;
+              if (msg.payload &&
+                msg.payload.result &&
+                msg.payload.result.connection &&
+                (msg.payload.result.connection instanceof EventEmitter)) {
+                // Some operations return a Connection object with the result.
+                // Passing this large connection object might be heavy - it will
+                // be cloned over and over by Node-RED, and there is no reason
+                // the typical user will need it.
+                // The mongodb package does not export the Connection prototype-function.
+                // Instead of loading the Connection prototype-function from the
+                // internal libs (which might change their path), I use the fact
+                // that it inherits EventEmitter.
+                delete msg.payload.result.connection;
+              }
               node.send(msg);
             }
             if (forEachIteration != err) {

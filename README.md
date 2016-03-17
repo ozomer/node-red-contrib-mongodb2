@@ -8,6 +8,17 @@ To pass multiple parameters to an operation fill `msg.payload` with an array (do
 
 # Change Log
 
+## Changes From 0.4
+**Deleting Connection from Op Result** - Some operations return a Connection object in their result:
+[deleteWriteOpResult](http://mongodb.github.io/node-mongodb-native/2.1/api/Collection.html#~deleteWriteOpResult),
+[insertOneWriteOpResult](http://mongodb.github.io/node-mongodb-native/2.1/api/Collection.html#~insertOneWriteOpResult),
+[insertWriteOpResult](http://mongodb.github.io/node-mongodb-native/2.1/api/Collection.html#~insertWriteOpResult),
+[updateWriteOpResult](http://mongodb.github.io/node-mongodb-native/2.1/api/Collection.html#~updateWriteOpResult),
+[WriteOpResult](http://mongodb.github.io/node-mongodb-native/2.1/api/Collection.html#~WriteOpResult).
+This object is large, and used to be cloned each time Node-RED sent the message.
+To avoid this, we delete it from the result.
+If you find any typical use-case where it is actually needed, please let me know.
+
 ## Changes From 0.3
 **Profiling Status** - Showing the number of requests, the number of successful responses and the number of errors.
 Using a 1-second debounce to avoid changing the status too often.
