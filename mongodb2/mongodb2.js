@@ -276,8 +276,17 @@ module.exports = function(RED) {
             }
             if (forEachEnd != err) {
               // send msg (when err == forEachEnd, this is just a forEach completion).
-              msg.payload = result;
-              if (msg.payload) {
+              var messageToSend;
+              if (forEachIteration == err) {
+                // Clone, so we can send the same message again with a different payload
+                // in each iteration.
+                messageToSend = RED.runtime.util.cloneMessage(msg);
+              } else {
+                // No need to clone - the same message will not be sent again.
+                messageToSend = msg;
+              }
+              messageToSend.payload = result;
+              if (messageToSend.payload) {
                 // Some operations return a Connection object with the result.
                 // Passing this large connection object might be heavy - it will
                 // be cloned over and over by Node-RED, and there is no reason
@@ -286,14 +295,14 @@ module.exports = function(RED) {
                 // Instead of loading the Connection prototype-function from the
                 // internal libs (which might change their path), I use the fact
                 // that it inherits EventEmitter.
-                if (msg.payload.connection instanceof EventEmitter) {
-                  delete msg.payload.connection;
+                if (messageToSend.payload.connection instanceof EventEmitter) {
+                  delete messageToSend.payload.connection;
                 }
-                if (msg.payload.result && msg.payload.result.connection instanceof EventEmitter) {
+                if (messageToSend.payload.result && messageToSend.payload.result.connection instanceof EventEmitter) {
                   delete msg.payload.result.connection;
                 }
               }
-              node.send(msg);
+              node.send(messageToSend);
             }
             if (forEachIteration != err) {
               // clear status
