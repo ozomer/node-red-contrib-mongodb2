@@ -267,7 +267,7 @@ module.exports = function(RED) {
         profiling.requests += 1;
         debounceProfilingStatus();
         try {
-          operation.apply(collection || client.db, args.concat(function(err, result) {
+          operation.apply(collection || client.db, args.concat(function(err, response) {
             if (err && (forEachIteration != err) && (forEachEnd != err)) {
               profiling.error += 1;
               debounceProfilingStatus();
@@ -275,18 +275,7 @@ module.exports = function(RED) {
               return messageHandlingCompleted();
             }
             if (forEachEnd != err) {
-              // send msg (when err == forEachEnd, this is just a forEach completion).
-              var messageToSend;
-              if (forEachIteration == err) {
-                // Clone, so we can send the same message again with a different payload
-                // in each iteration.
-                messageToSend = RED.runtime.util.cloneMessage(msg);
-              } else {
-                // No need to clone - the same message will not be sent again.
-                messageToSend = msg;
-              }
-              messageToSend.payload = result;
-              if (messageToSend.payload) {
+              if (response && response.payload) {
                 // Some operations return a Connection object with the result.
                 // Passing this large connection object might be heavy - it will
                 // be cloned over and over by Node-RED, and there is no reason
@@ -295,14 +284,26 @@ module.exports = function(RED) {
                 // Instead of loading the Connection prototype-function from the
                 // internal libs (which might change their path), I use the fact
                 // that it inherits EventEmitter.
-                if (messageToSend.payload.connection instanceof EventEmitter) {
-                  delete messageToSend.payload.connection;
+                if (response.connection instanceof EventEmitter) {
+                  delete response.connection;
                 }
-                if (messageToSend.payload.result && messageToSend.payload.result.connection instanceof EventEmitter) {
-                  delete msg.payload.result.connection;
+                if (response.result && response.result.connection instanceof EventEmitter) {
+                  delete response.result.connection;
                 }
               }
-              node.send(messageToSend);
+              // send msg (when err == forEachEnd, this is just a forEach completion).
+              var messageToSend;
+              if (forEachIteration == err) {
+                // Clone, so we can send the same message again with a different payload
+                // in each iteration.
+                messageToSend = RED.runtime.util.cloneMessage(msg);
+                messageToSend.payload = response;
+                node.send(messageToSend);
+              } else {
+                // No need to clone - the same message will not be sent again.
+                msg.payload = response;
+                node.send(msg);
+              }
             }
             if (forEachIteration != err) {
               // clear status
