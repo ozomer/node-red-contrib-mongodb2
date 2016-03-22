@@ -295,7 +295,7 @@ module.exports = function(RED) {
               if (forEachIteration == err) {
                 // Clone, so we can send the same message again with a different payload
                 // in each iteration.
-                var messageToSend = RED.runtime.util.cloneMessage(msg);
+                var messageToSend = RED.util.cloneMessage(msg);
                 messageToSend.payload = response;
                 node.send(messageToSend);
               } else {
