@@ -275,7 +275,7 @@ module.exports = function(RED) {
               return messageHandlingCompleted();
             }
             if (forEachEnd != err) {
-              if (response && response.payload) {
+              if (!!response) {
                 // Some operations return a Connection object with the result.
                 // Passing this large connection object might be heavy - it will
                 // be cloned over and over by Node-RED, and there is no reason
