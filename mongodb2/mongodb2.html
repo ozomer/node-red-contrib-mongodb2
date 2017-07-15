@@ -1,5 +1,5 @@
 <!--
-  Copyright 2016 Awear Solutions Ltd.
+  Copyright 2017 Awear Solutions Ltd.
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -68,7 +68,7 @@ RED.nodes.registerType("mongodb2", {
     }
   },
   "label": function() {
-    return this.name || (this.hostname + ":" + this.port + "/" + this.db);
+    return this.name || ('' + this.uri).replace(/^(\w+\:\/\/)([^\@]*\@)?/, '$1');
   }
 });
 </script>
