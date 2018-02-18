@@ -19,8 +19,8 @@ module.exports = function(RED) {
   var EventEmitter = require("events").EventEmitter;
   var appEnv = require("cfenv").getAppEnv();
   var mongodb = require("mongodb");
-  var forEachIteration = new Error("node-red-contrib-mongodb2 forEach iteration");
-  var forEachEnd = new Error("node-red-contrib-mongodb2 forEach end");
+  var forEachIteration = new Error("node-red-contrib-mongodb3 forEach iteration");
+  var forEachEnd = new Error("node-red-contrib-mongodb3 forEach end");
 
   var services = [];
   Object.keys(appEnv.services).forEach(function(label) {
@@ -100,7 +100,7 @@ module.exports = function(RED) {
     return callback(null, this);
   };
 
-  RED.nodes.registerType("mongodb2", function Mongo2ConfigNode(n) {
+  RED.nodes.registerType("mongodb3", function MongoConfigNode(n) {
     RED.nodes.createNode(this, n);
     this.uri = '' + n.uri;
     if (this.credentials.user || this.credentials.password) {
@@ -127,11 +127,11 @@ module.exports = function(RED) {
     }
   });
 
-  RED.httpAdmin.get('/mongodb2/vcap', function(req, res) {
+  RED.httpAdmin.get('/mongodb3/vcap', function(req, res) {
     res.json(services);
   });
 
-  RED.httpAdmin.get('/mongodb2/operations', function(req, res) {
+  RED.httpAdmin.get('/mongodb3/operations', function(req, res) {
     res.json(Object.keys(operations).sort());
   });
 
@@ -143,7 +143,9 @@ module.exports = function(RED) {
       mongoPool['#' + config.deploymentId] = poolCell = {
         "instances": 0,
         // es6-promise. A client will be called only once.
-        "promise": mongodb.MongoClient.connect(config.uri, config.options || {}).then(function(db) {
+        "promise": mongodb.MongoClient.connect(config.uri, config.options || {}).then(function(client) {
+          const db_name = config.uri.match(/.*\/(.*?)$/)[1];
+          const db = client.db(db_name);
           return {
             "db": db,
             "queue": [],
@@ -172,7 +174,7 @@ module.exports = function(RED) {
     }
   }
 
-  RED.nodes.registerType("mongodb2 in", function Mongo2InputNode(n) {
+  RED.nodes.registerType("mongodb3 in", function MongoInputNode(n) {
     RED.nodes.createNode(this, n);
     this.configNode = n.configNode;
     this.collection = n.collection;
@@ -191,7 +193,7 @@ module.exports = function(RED) {
       }
     }
     if (!this.config || !this.config.uri) {
-      this.error("missing mongodb2 configuration");
+      this.error("missing mongodb3 configuration");
       return;
     }
     var node = this;
@@ -218,7 +220,8 @@ module.exports = function(RED) {
           handleMessage(msg);
         });
       });
-      node.on('node-red-contrib-mongodb2 handleMessage', function(msg) {
+
+      node.on('node-red-contrib-mongodb3 handleMessage', function(msg) {
         // see: messageHandlingCompleted
         setImmediate(function(){
           handleMessage(msg);
@@ -248,7 +251,6 @@ module.exports = function(RED) {
 
         delete msg.collection;
         delete msg.operation;
-
         var args = msg.payload;
         if (!Array.isArray(args)) {
           args = [args];
@@ -345,7 +347,7 @@ module.exports = function(RED) {
             continue;
           }
           // Handle the pending message.
-          if (!targetNode.emit('node-red-contrib-mongodb2 handleMessage', pendingMessage.msg)) {
+          if (!targetNode.emit('node-red-contrib-mongodb3 handleMessage', pendingMessage.msg)) {
             // Safety check - if emit() returned false it means there are no listeners to the event.
             // Was the target node closed?
             // This shouldn't happen normally, but if it does, we must try to handle the next message in the queue.
@@ -362,7 +364,7 @@ module.exports = function(RED) {
         }
         // The queue is empty. The number of parallel ops has reduced.
         if (client.parallelOps <= 0) {
-          return node.error("Something went wrong with node-red-contrib-mongodb2 parallel-ops count");
+          return node.error("Something went wrong with node-red-contrib-mongodb3 parallel-ops count");
         }
         client.parallelOps -= 1;
       }
@@ -370,7 +372,6 @@ module.exports = function(RED) {
       // Failed to create db client
       node.error(err);
     });
-
     var profiling = {
       "requests": 0,
       "success": 0,
@@ -396,12 +397,11 @@ module.exports = function(RED) {
         debouncer = null;
       }, 1000);
     }
-
     node.on('close', function() {
       if (node.config) {
         closeClient(node.config);
       }
-      node.removeAllListeners('node-red-contrib-mongodb2 handleMessage');
+      node.removeAllListeners('node-red-contrib-mongodb3 handleMessage');
       if (debouncer) {
         clearTimeout(debouncer);
       }
