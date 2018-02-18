@@ -1,4 +1,4 @@
-# node-red-contrib-mongodb2
+# node-red-contrib-mongodb3
 MongoDB 3 driver node for Node-RED
 
 Inspired from [node-red-bluemix-nodes](https://github.com/node-red/node-red-bluemix-nodes/tree/master/mongo) and [MongoDB 3 Driver](http://mongodb.github.io/node-mongodb-native/3.0)
