@@ -147,6 +147,7 @@ module.exports = function(RED) {
           const db_name = config.uri.match(/.*\/(.*?)$/)[1];
           const db = client.db(db_name);
           return {
+			"client": client,
             "db": db,
             "queue": [],
             "parallelOps": 0 // current number of operations
@@ -167,7 +168,7 @@ module.exports = function(RED) {
     if (poolCell.instances === 0) {
       delete mongoPool['#' + config.deploymentId];
       poolCell.promise.then(function(client) {
-        client.db.close();
+        client.client.close();
       }, function() { // ignore error
         // db-client was not created in the first place.
       });
