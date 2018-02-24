@@ -14,7 +14,7 @@
   limitations under the License.
 -->
 
-<script type="text/x-red" data-template-name="mongodb2">
+<script type="text/x-red" data-template-name="mongodb3">
   <div class="form-row">
     <label for="node-config-input-uri"><i class="icon-globe"></i> URI</label>
     <input type="text" id="node-config-input-uri" placeholder="mongodb://host1.yourprovider.com:27017,host2.yourprovider.com:27017/yourdb?replicaSet=foo" />
@@ -42,9 +42,9 @@
 </script>
 
 <script type="text/javascript">
-RED.nodes.registerType("mongodb2", {
+RED.nodes.registerType("mongodb3", {
   "category": "config",
-  "color": "#b7a492",
+  "color": "#68B368",
   "defaults": {
     "uri": {
       "value": ""
@@ -73,7 +73,7 @@ RED.nodes.registerType("mongodb2", {
 });
 </script>
 
-<script type="text/x-red" data-template-name="mongodb2 in">
+<script type="text/x-red" data-template-name="mongodb3 in">
   <div class="form-row">
     <label for="node-input-service"><i class="icon-folder-close"></i> Service</label>
     <select id="node-input-service">
@@ -104,24 +104,24 @@ RED.nodes.registerType("mongodb2", {
   </div>
 </script>
 
-<script type="text/x-red" data-help-name="mongodb2 in">
+<script type="text/x-red" data-help-name="mongodb3 in">
   <p>Calls a MongoDB collection method based on the selected operator.</p>
   <p>If <b>msg.payload</b> is an array, each element is passed as an arugment.</p>
-  <p>See the <a href="http://mongodb.github.io/node-mongodb-native/2.1/api/Collection.html" target="_blank"><i>MongoDB collection api-2 docs</i></a> for examples.</p>
+  <p>See the <a href="http://mongodb.github.io/node-mongodb-native/3.0/api/Collection.html" target="_blank"><i>MongoDB collection api-3 docs</i></a> for examples.</p>
   <p>The result is returned in <b>msg.payload</b>.</p>
 </script>
 
 <script type="text/javascript">
-RED.nodes.registerType("mongodb2 in", {
+RED.nodes.registerType("mongodb3 in", {
   category: "storage-input",
-  color: "#b7a492",
+  color: "#68B368",
   defaults: {
     service: {
       value: "",
       required: true
     },
     configNode: {
-      type: "mongodb2",
+      type: "mongodb3",
       validate: function validateServer(v) {
         return this.service !== "_ext_" || v !== "_ADD_";
       }
@@ -144,7 +144,7 @@ RED.nodes.registerType("mongodb2 in", {
     if (this.name) {
       return this.name;
     }
-    var serviceName = "mongodb2";
+    var serviceName = "mongodb3";
     if (this.service && this.service !== "_ext_") {
       serviceName = this.service;
     } else if (mongoConfigNode) {
@@ -158,7 +158,7 @@ RED.nodes.registerType("mongodb2 in", {
   oneditprepare: function oneditprepare() {
     var serviceSelect = $('#node-input-service');
     var node = this;
-    $.getJSON("mongodb2/vcap", function(data) {
+    $.getJSON("mongodb3/vcap", function(data) {
       var last = serviceSelect.children().last();
       var opts = data.map(function(d) {
         return $('<option></option>').attr('value', d.name).attr('selected', node.service === d.name).text(d.name).wrap('<p/>').parent().html();
@@ -185,7 +185,7 @@ RED.nodes.registerType("mongodb2 in", {
 
     var selectOperation = $('#node-input-operation');
     console.log('getting operations json');
-    $.getJSON("mongodb2/operations", function(data) {
+    $.getJSON("mongodb3/operations", function(data) {
       console.log('operations', data);
       selectOperation.children().last().after(data.map(function(d) {
         return $('<option></option>').attr('value', d).attr('selected', node.operation === d).text(d).wrap('<p/>').parent().html();
