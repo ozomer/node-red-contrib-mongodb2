@@ -1,5 +1,5 @@
 /**
-* Copyright 2017 Awear Solutions Ltd.
+* Copyright 2018 Awear Solutions Ltd.
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -16,13 +16,13 @@
 
 module.exports = function(RED) {
   "use strict";
-  var EventEmitter = require("events").EventEmitter;
-  var appEnv = require("cfenv").getAppEnv();
-  var mongodb = require("mongodb");
-  var forEachIteration = new Error("node-red-contrib-mongodb3 forEach iteration");
-  var forEachEnd = new Error("node-red-contrib-mongodb3 forEach end");
+  const EventEmitter = require('events').EventEmitter;
+  const appEnv = require('cfenv').getAppEnv();
+  const mongodb = require('mongodb');
+  const forEachIteration = new Error("node-red-contrib-mongodb3 forEach iteration");
+  const forEachEnd = new Error("node-red-contrib-mongodb3 forEach end");
 
-  var services = [];
+  let services = [];
   Object.keys(appEnv.services).forEach(function(label) {
     if ((/^mongo/i).test(label)) {
       services = services.concat(appEnv.services[label].map(function(service) {
@@ -34,7 +34,7 @@ module.exports = function(RED) {
     }
   });
 
-  var operations = {};
+  const operations = {};
   Object.keys(mongodb.Collection.prototype).forEach(function(operationName) {
     if ('function' == typeof Object.getOwnPropertyDescriptor(mongodb.Collection.prototype, operationName).value) {
       operations[operationName] = mongodb.Collection.prototype[operationName];
@@ -44,13 +44,13 @@ module.exports = function(RED) {
   delete operations.find;
 
   operations['find.toArray'] = function() {
-    var args = Array.prototype.slice.call(arguments, 0);
-    var callback = args.pop();
+    const args = Array.prototype.slice.call(arguments, 0);
+    const callback = args.pop();
     mongodb.Collection.prototype.find.apply(this, args).toArray(callback);
   };
   operations['find.forEach'] = function() {
-    var args = Array.prototype.slice.call(arguments, 0);
-    var callback = args.pop();
+    const args = Array.prototype.slice.call(arguments, 0);
+    const callback = args.pop();
     mongodb.Collection.prototype.find.apply(this, args).forEach(function(doc) {
       return callback(forEachIteration, doc);
     }, function(err) {
@@ -61,13 +61,13 @@ module.exports = function(RED) {
   // We don't want to pass the aggregate's cursor directly.
   delete operations.aggregate;
   operations['aggregate.toArray'] = function() {
-    var args = Array.prototype.slice.call(arguments, 0);
-    var callback = args.pop();
+    const args = Array.prototype.slice.call(arguments, 0);
+    const callback = args.pop();
     mongodb.Collection.prototype.aggregate.apply(this, args).toArray(callback);
   };
   operations['aggregate.forEach'] = function() {
-    var args = Array.prototype.slice.call(arguments, 0);
-    var callback = args.pop();
+    const args = Array.prototype.slice.call(arguments, 0);
+    const callback = args.pop();
     mongodb.Collection.prototype.aggregate.apply(this, args).forEach(function(doc) {
       return callback(forEachIteration, doc);
     }, function(err) {
@@ -78,13 +78,13 @@ module.exports = function(RED) {
   // We don't want to pass the listIndexes's cursor directly.
   delete operations.listIndexes;
   operations['listIndexes.toArray'] = function() {
-    var args = Array.prototype.slice.call(arguments, 0);
-    var callback = args.pop();
+    const args = Array.prototype.slice.call(arguments, 0);
+    const callback = args.pop();
     mongodb.Collection.prototype.listIndexes.apply(this, args).toArray(callback);
   };
   operations['listIndexes.forEach'] = function() {
-    var args = Array.prototype.slice.call(arguments, 0);
-    var callback = args.pop();
+    const args = Array.prototype.slice.call(arguments, 0);
+    const callback = args.pop();
     mongodb.Collection.prototype.listIndexes.apply(this, args).forEach(function(doc) {
       return callback(forEachIteration, doc);
     }, function(err) {
@@ -104,7 +104,7 @@ module.exports = function(RED) {
     RED.nodes.createNode(this, n);
     this.uri = '' + n.uri;
     if (this.credentials.user || this.credentials.password) {
-      this.uri = this.uri.replace('://', '://' + encodeURIComponent(this.credentials.user) + ':' + encodeURIComponent(this.credentials.password) + '@');
+      this.uri = this.uri.replace(/^mongodb:\/\//, 'mongodb://' + encodeURIComponent(this.credentials.user) + ':' + encodeURIComponent(this.credentials.password) + '@');
     }
     this.name = n.name;
     this.parallelism = n.parallelism * 1;
@@ -135,19 +135,19 @@ module.exports = function(RED) {
     res.json(Object.keys(operations).sort());
   });
 
-  var mongoPool = {};
+  const mongoPool = {};
 
   function getClient(config) {
-    var poolCell = mongoPool['#' + config.deploymentId];
+    let poolCell = mongoPool['#' + config.deploymentId];
     if (!poolCell) {
       mongoPool['#' + config.deploymentId] = poolCell = {
         "instances": 0,
         // es6-promise. A client will be called only once.
         "promise": mongodb.MongoClient.connect(config.uri, config.options || {}).then(function(client) {
-          const db_name = config.uri.match(/.*\/(.*?)$/)[1];
-          const db = client.db(db_name);
+          const dbName = decodeURIComponent((config.uri.match(/^.*\/([^?]*)\??.*$/) || [])[1] || '');
+          const db = client.db(dbName);
           return {
-			"client": client,
+			      "client": client,
             "db": db,
             "queue": [],
             "parallelOps": 0 // current number of operations
@@ -160,7 +160,7 @@ module.exports = function(RED) {
   }
 
   function closeClient(config) {
-    var poolCell = mongoPool['#' + config.deploymentId];
+    const poolCell = mongoPool['#' + config.deploymentId];
     if (!poolCell) {
       return;
     }
@@ -168,7 +168,9 @@ module.exports = function(RED) {
     if (poolCell.instances === 0) {
       delete mongoPool['#' + config.deploymentId];
       poolCell.promise.then(function(client) {
-        client.client.close();
+        client.client.close().catch(function(err) {
+          node.error("Error while closing client: " + err);
+        });
       }, function() { // ignore error
         // db-client was not created in the first place.
       });
@@ -184,7 +186,7 @@ module.exports = function(RED) {
       // Refer to the config node's id, uri, options, parallelism and warn function.
       this.config = RED.nodes.getNode(this.configNode);
     } else if (n.service) {
-      var configService = appEnv.getService(n.service);
+      const configService = appEnv.getService(n.service);
       if (configService) {
         // Only a uri is defined.
         this.config = {
@@ -197,13 +199,13 @@ module.exports = function(RED) {
       this.error("missing mongodb3 configuration");
       return;
     }
-    var node = this;
+    const node = this;
     getClient(node.config).then(function(client) {
-      var nodeCollection;
+      let nodeCollection;
       if (node.collection) {
         nodeCollection = client.db.collection(node.collection);
       }
-      var nodeOperation;
+      let nodeOperation;
       if (node.operation) {
         nodeOperation = operations[node.operation];
       }
@@ -230,7 +232,7 @@ module.exports = function(RED) {
       });
 
       function handleMessage(msg) {
-        var operation = nodeOperation;
+        let operation = nodeOperation;
         if (!operation && msg.operation) {
           operation = operations[msg.operation];
         }
@@ -238,7 +240,7 @@ module.exports = function(RED) {
           node.error("No operation defined", msg);
           return messageHandlingCompleted();
         }
-        var collection; // stays undefined in the case of "db" operation.
+        let collection; // stays undefined in the case of "db" operation.
         if (operation != operations.db) {
           collection = nodeCollection;
           if (!collection && msg.collection) {
@@ -252,7 +254,7 @@ module.exports = function(RED) {
 
         delete msg.collection;
         delete msg.operation;
-        var args = msg.payload;
+        let args = msg.payload;
         if (!Array.isArray(args)) {
           args = [args];
         }
@@ -298,7 +300,7 @@ module.exports = function(RED) {
               if (forEachIteration == err) {
                 // Clone, so we can send the same message again with a different payload
                 // in each iteration.
-                var messageToSend = RED.util.cloneMessage(msg);
+                const messageToSend = RED.util.cloneMessage(msg);
                 messageToSend.payload = response;
                 node.send(messageToSend);
               } else {
@@ -326,14 +328,14 @@ module.exports = function(RED) {
       }
       function handlePendingMessageOnDemand() {
         while (client.queue.length > 0) {
-          var pendingMessage = client.queue.shift();
-          var targetNode = RED.nodes.getNode(pendingMessage.node_id);
+          const pendingMessage = client.queue.shift();
+          const targetNode = RED.nodes.getNode(pendingMessage.node_id);
           if (!targetNode) {
             // The node was removed before handling the pending message.
             // This is just a warning because a similar scenario can happen if
             // a node was removed just before handling a message that was sent
             // to it.
-            var warningMessage = "Node " + pendingMessage.node_id + " was removed while having a pending message";
+            const warningMessage = "Node " + pendingMessage.node_id + " was removed while having a pending message";
             if (node.config.warn) {
               // The warning will appear from the config node, because the target
               // node cannot be found.
@@ -352,7 +354,7 @@ module.exports = function(RED) {
             // Safety check - if emit() returned false it means there are no listeners to the event.
             // Was the target node closed?
             // This shouldn't happen normally, but if it does, we must try to handle the next message in the queue.
-            var errorMessage = "Node " + pendingMessage.node_id + " could not handle the pending message";
+            const errorMessage = "Node " + pendingMessage.node_id + " could not handle the pending message";
             if (node.config.error) {
               node.config.error(errorMessage, pendingMessage.msg);
             } else {
@@ -373,7 +375,7 @@ module.exports = function(RED) {
       // Failed to create db client
       node.error(err);
     });
-    var profiling = {
+    const profiling = {
       "requests": 0,
       "success": 0,
       "error": 0
@@ -386,7 +388,7 @@ module.exports = function(RED) {
       });
     }
 
-    var debouncer = null;
+    let debouncer = null;
     function debounceProfilingStatus() {
       if (debouncer) {
         return;
