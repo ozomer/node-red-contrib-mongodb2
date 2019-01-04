@@ -296,6 +296,13 @@ module.exports = function(RED) {
                   delete response.result.connection;
                 }
               }
+							// `response` is an instance of CommandResult, and does not seem to have the standard Object methods, 
+							// which means that some props are not correctly being forwarded to msg.payload (eg "ops" ouputted from `insertOne`)
+							// cloning the object fixes that.							
+							response = Object.assign({}, response);
+							// response.message includes info about the DB op, but is large and never used (like the connection)
+							delete response.message;              
+							
               // send msg (when err == forEachEnd, this is just a forEach completion).
               if (forEachIteration == err) {
                 // Clone, so we can send the same message again with a different payload
