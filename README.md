@@ -18,7 +18,7 @@ Using a single URI field allows you to specify Host, Port and Database configura
 Notice that the Username & Password fields did remain. They will still be saved as Node-RED credentials (i.e. kept private). If the Username is not empty or the Password is not empty, they will be escaped and added the the URI after the `mongodb://` prefix (separated by ':' and with a '@' after them). You can also leave these fields empty and enter the credentials directly in the URI, following the standard syntax: `mongodb://youruser:yourpassword@host1.yourmongoprovider.com:27017,host2.yourmongoprovider.com:27017/yourdb?replicaSet=foo`. **Do not enter your credentials both in the URI and the Username & Password fields** - this will create an invalid URI such as: `mongodb://youruserfromfield:yourpasswordformfield@youruserfromuri:yourpasswordfromuri@host1.yourmongoprovider.com:27017,host2.yourmongoprovider.com:27017/yourdb?replicaSet=foo`.
 
 **specifying authentication database** - 
-most recent deployments of mongoDB store user credentials in a separate databse (usually `admin`) rather than allongside the data in each Db. Therefore you will likley need to provide a `authSource` aparemter in your URI
+most recent deployments of mongoDB store user credentials in a separate databse (usually `admin`) rather than allongside the data in each Db. Therefore you will likley need to provide a `authSource` parameter in your URI
 eg: `mongodb://host1.yourmongoprovider.com:27017/yourdb?ssl=true&authSource=admin&replicaSet=foo`
 
 **Parallelism Limit** - Sending a lot of commands in a short time to the underlying mongodb-native driver, without waiting for their response, may cause serious problems and slow down the whole app.
