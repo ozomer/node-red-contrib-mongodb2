@@ -92,6 +92,26 @@ module.exports = function(RED) {
     });
   };
 
+   // We don't want to pass the listCollections's cursor directly.
+   delete operations.listCollections;
+   operations['db.listCollections.toArray'] = function() {
+      const args = Array.prototype.slice.call(arguments, 0);
+      const callback = args.pop();
+      mongodb.Db.prototype.listCollections.apply(this, args).toArray(callback);
+   };
+   operations['db.listCollections.forEach'] = function() {
+      const args = Array.prototype.slice.call(arguments, 0);
+      const callback = args.pop();
+      mongodb.Db.prototype.listCollections.apply(this, args).forEach(
+         function(doc) {
+            return callback(forEachIteration, doc);
+         },
+         function(err) {
+            return callback(err || forEachEnd);
+         }
+      );
+   };
+	
   operations.db = function(callback) {
     return callback(null, this);
   };
@@ -241,7 +261,11 @@ module.exports = function(RED) {
           return messageHandlingCompleted();
         }
         let collection; // stays undefined in the case of "db" operation.
-        if (operation != operations.db) {
+        if (
+                  operation != operations.db &&
+                  operation != operations['db.listCollections.toArray'] &&
+                  operation != operations['db.listCollections.forEach']
+               ) {
           collection = nodeCollection;
           if (!collection && msg.collection) {
             collection = client.db.collection(msg.collection);
