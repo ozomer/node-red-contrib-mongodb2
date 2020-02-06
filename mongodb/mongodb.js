@@ -120,6 +120,14 @@ module.exports = function(RED) {
     return callback(null, this);
   };
 
+  const customOperations = new Set([
+    'find.toArray', 'find.forEach', 
+    'aggregate.toArray', 'aggregate.forEach', 
+    'listIndexes.toArray', 'listIndexes.forEach',
+    'db.listCollections.toArray', 'db.listCollections.forEach',
+    'db', 'collection'
+  ].map(k => operations[k]));
+
   RED.nodes.registerType("mongodb3", function MongoConfigNode(n) {
     RED.nodes.createNode(this, n);
     this.uri = '' + n.uri;
@@ -320,12 +328,15 @@ module.exports = function(RED) {
                   delete response.result.connection;
                 }
               }
-							// `response` is an instance of CommandResult, and does not seem to have the standard Object methods, 
-							// which means that some props are not correctly being forwarded to msg.payload (eg "ops" ouputted from `insertOne`)
-							// cloning the object fixes that.							
-							response = Object.assign({}, response);
-							// response.message includes info about the DB op, but is large and never used (like the connection)
-							delete response.message;              
+
+              if (!customOperations.has(operation)) {
+                // `response` is an instance of CommandResult, and does not seem to have the standard Object methods, 
+							  // which means that some props are not correctly being forwarded to msg.payload (eg "ops" ouputted from `insertOne`)
+                // cloning the object fixes that.				
+                response = Object.assign({}, response);
+                // response.message includes info about the DB op, but is large and never used (like the connection)
+                delete response.message;
+              }              
 							
               // send msg (when err == forEachEnd, this is just a forEach completion).
               if (forEachIteration == err) {
