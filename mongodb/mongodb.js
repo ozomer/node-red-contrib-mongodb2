@@ -22,6 +22,14 @@ module.exports = function(RED) {
   const forEachIteration = new Error("node-red-contrib-mongodb3 forEach iteration");
   const forEachEnd = new Error("node-red-contrib-mongodb3 forEach end");
 
+  function checkServerIdentity(servername, cert) {
+    if (servername !== String(cert.subject.CN)) {
+        return 'servername \'' + servername + '\' does not equal CN \''
+            + cert.subject.CN + '\' of server cert.';
+    }
+    return undefined;
+  }
+
   function sendMsg(node, msg) {
       node.send([msg, null]);
   }
@@ -147,6 +155,13 @@ module.exports = function(RED) {
       } catch (err) {
         this.error("Failed to parse options: " + err);
       }
+    } else {
+      this.options = {};
+    }
+    if(n.sslCheckViaCN) {
+      // if configured use custom server identity check that checks for server identity
+      // by checking if servername == CN
+      this.options = checkServerIdentity;
     }
     this.deploymentId = (1 + Math.random() * 0xffffffff).toString(16).replace('.', '');
   }, {
