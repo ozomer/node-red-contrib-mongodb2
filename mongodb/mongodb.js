@@ -37,9 +37,7 @@ module.exports = function(RED) {
   function sendError(node, msg, error) {
       node.error(error, msg);
       msg = RED.util.cloneMessage(msg);
-      msg.payload = {
-          error: error
-      }
+      msg.error = error;
       node.send([null, msg]);
   }
 
