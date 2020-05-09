@@ -22,6 +22,19 @@ module.exports = function(RED) {
   const forEachIteration = new Error("node-red-contrib-mongodb3 forEach iteration");
   const forEachEnd = new Error("node-red-contrib-mongodb3 forEach end");
 
+  function sendMsg(node, msg) {
+      node.send([msg, null]);
+  }
+
+  function sendError(node, msg, error) {
+      node.error(error, msg);
+      msg = RED.util.cloneMessage(msg);
+      msg.payload = {
+          error: error
+      }
+      node.send([null, msg]);
+  }
+
   let services = [];
   Object.keys(appEnv.services).forEach(function(label) {
     if ((/^mongo/i).test(label)) {
@@ -257,7 +270,7 @@ module.exports = function(RED) {
           operation = operations[msg.operation];
         }
         if (!operation) {
-          node.error("No operation defined", msg);
+          sendError(node, msg, "No operation defined");
           return messageHandlingCompleted();
         }
         let collection; // stays undefined in the case of "db" operation.
@@ -271,7 +284,7 @@ module.exports = function(RED) {
             collection = client.db.collection(msg.collection);
           }
           if (!collection) {
-            node.error("No collection defined", msg);
+            sendError(node, msg, "No collection defined");
             return messageHandlingCompleted();
           }
         }
@@ -300,7 +313,7 @@ module.exports = function(RED) {
             if (err && (forEachIteration != err) && (forEachEnd != err)) {
               profiling.error += 1;
               debounceProfilingStatus();
-              node.error(err, msg);
+              sendError(node, msg, err);
               return messageHandlingCompleted();
             }
             if (forEachEnd != err) {
@@ -333,11 +346,11 @@ module.exports = function(RED) {
                 // in each iteration.
                 const messageToSend = RED.util.cloneMessage(msg);
                 messageToSend.payload = response;
-                node.send(messageToSend);
+                sendMsg(node, messageToSend);
               } else {
                 // No need to clone - the same message will not be sent again.
                 msg.payload = response;
-                node.send(msg);
+                sendMsg(node, msg);
               }
             }
             if (forEachIteration != err) {
@@ -350,7 +363,7 @@ module.exports = function(RED) {
         } catch(err) {
           profiling.error += 1;
           debounceProfilingStatus();
-          node.error(err, msg);
+          sendError(node, msg, err);
           return messageHandlingCompleted();
         }
       }
@@ -389,7 +402,7 @@ module.exports = function(RED) {
             if (node.config.error) {
               node.config.error(errorMessage, pendingMessage.msg);
             } else {
-              node.error(errorMessage, pendingMessage.msg);
+              sendError(node, pendingMessage.msg, errorMessage)
             }
             continue;
           }
@@ -398,13 +411,14 @@ module.exports = function(RED) {
         }
         // The queue is empty. The number of parallel ops has reduced.
         if (client.parallelOps <= 0) {
-          return node.error("Something went wrong with node-red-contrib-mongodb3 parallel-ops count");
+          sendError(node, {}, "Something went wrong with node-red-contrib-mongodb3 parallel-ops count");
+          return
         }
         client.parallelOps -= 1;
       }
     }, function(err) {
       // Failed to create db client
-      node.error(err);
+      sendError(node, {}, err);
     });
     const profiling = {
       "requests": 0,
