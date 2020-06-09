@@ -23,7 +23,7 @@ module.exports = function(RED) {
   const forEachEnd = new Error("node-red-contrib-mongodb3 forEach end");
 
   function checkServerIdentity(servername, cert) {
-    if (servername !== String(cert.subject.CN)) {
+    if (cert && cert.subject && servername !== String(cert.subject.CN)) {
         return 'servername \'' + servername + '\' does not equal CN \''
             + cert.subject.CN + '\' of server cert.';
     }
