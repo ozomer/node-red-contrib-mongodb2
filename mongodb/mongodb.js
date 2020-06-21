@@ -164,7 +164,7 @@ module.exports = function(RED) {
     if(n.sslCheckViaCN) {
       // if configured use custom server identity check that checks for server identity
       // by checking if servername == CN
-      this.options['checkServerIdentity'] = checkServerIdentity;
+      this.options.checkServerIdentity= checkServerIdentity;
     }
     this.deploymentId = (1 + Math.random() * 0xffffffff).toString(16).replace('.', '');
   }, {
